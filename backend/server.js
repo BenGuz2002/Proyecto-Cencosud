@@ -1,133 +1,98 @@
 const express = require('express');
-const mysql = require('mysql');
-const cors = require('cors');
-const dotenv = require('dotenv');
-
-dotenv.config();
-
 const app = express();
+const mysql = require('mysql2/promise');
+const cors = require('cors');
+const crypto = require('crypto');
 
-// Middleware
+
+
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Conexión a MySQL
-const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root', // Cambiar según tu usuario de MySQL
-  password: '5170',
-  database: 'cencosud' // Cambiar según tu base de datos
+// Función para hashear contraseña
+const hashPassword = (password) => {
+  return crypto.createHash('sha256').update(password).digest('hex');
+};
+
+const db = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "5170",
+    database: "cencosud"
 });
 
-// Conectar a la base de datos
-connection.connect((err) => {
-  if (err) {
-    console.error('Error conectando a MySQL:', err);
-    return;
-  }
-  console.log('✅ Conectado a MySQL correctamente');
-});
 
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.json({ mensaje: 'Servidor funcionando correctamente' });
-});
+app.post("/create", (req, res) => {
+    // constantes para usuario
+    const id = req.params.id;
+    const nombre = req.body.nombre;
+    const fecha_ingreso = req.body.fecha_ingreso;
+    const departamento = req.body.departamento;
 
-// Ruta para obtener todos los usuarios
-app.get('/api/usuarios', (req, res) => {
-  const query = 'SELECT * FROM usuario';
-  
-  connection.query(query, (err, results) => {
-    if (err) {
-      console.error('Error en la query:', err);
-      return res.status(500).json({ error: 'Error en la base de datos' });
+    // Constantes para fechas
+    const fecha = req.body.fecha;
+    const usuario_id = req.body.usuario_id;
+    const evaluacion = req.body.evaluacion;
+    const sueldo_base = req.body.sueldo_base;
+    const bono = req.body.bono;
+
+    db.query("INSERT INTO fechas (fecha, usuario_id, evaluacion, sueldo_base, bono) VALUES (?,?,?,?,?)", [fecha, usuario_id, evaluacion, sueldo_base, bono], 
+    (err, result) => {
+        if(err) {
+            console.log(err);
+        } 
+        else {
+            res.send("Registro insertado");
+        }
     }
-    res.json(results);
+); 
+});
+
+app.post("/usuario", (req, res) => {
+    const nombre = req.body.nombre;
+    const fecha_ingreso = req.body.fecha_ingreso;
+    const departamento = req.body.departamento;
+
+    db.query(
+        "INSERT INTO usuario (nombre, fecha_ingreso, departamento) VALUES (?,?,?)",
+        [nombre, fecha_ingreso, departamento],
+    (err, result) => {
+        if(err) {
+            console.log(err);
+        } 
+        else {
+            res.send("Usuario registrado");
+        }
+    });
+});
+
+app.get("/usuario", (req, res) => {
+  db.query("SELECT id, nombre, fecha_ingreso, departamento FROM usuario", (err, result) => {
+    if (err) {
+      res.status(500).send("Error al obtener usuarios");
+    } else {
+      res.json(result);
+    }
   });
 });
 
-// Ruta para obtener un usuario por ID
-app.get('/api/usuarios/:id', (req, res) => {
-  const { id } = req.params;
-  const query = 'SELECT * FROM usuario WHERE id = ?';
-  
-  connection.query(query, [id], (err, results) => {
+app.get("/usuario/:id", (req, res) => {
+  const id = req.params.id;
+  db.query("SELECT id, nombre FROM usuario WHERE id = ?", [id], (err, result) => {
     if (err) {
-      console.error('Error en la query:', err);
-      return res.status(500).json({ error: 'Error en la base de datos' });
+      res.status(500).json({ error: "Error al obtener usuario", details: err.message });
+    } else if (result.length === 0) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+    } else {
+      res.json(result);
     }
-    res.json(results);
   });
 });
 
-// Ruta para insertar un nuevo usuario
-app.post('/api/usuarios', (req, res) => {
-  const { nombre, departamento, fecha_ingreso } = req.body;
-  
-  if (!nombre || !departamento || !fecha_ingreso) {
-    return res.status(400).json({ error: 'Faltan campos requeridos' });
-  }
-  
-  const query = 'INSERT INTO usuario (nombre, departamento, fecha_ingreso) VALUES (?, ?, ?)';
-  
-  connection.query(query, [nombre, departamento, fecha_ingreso], (err, results) => {
-    if (err) {
-      console.error('Error al insertar:', err);
-      return res.status(500).json({ error: 'Error al insertar usuario' });
-    }
-    res.json({ mensaje: 'Usuario insertado correctamente', id: results.insertId });
-  });
-});
 
-// Ruta para actualizar un usuario
-app.put('/api/usuarios/:id', (req, res) => {
-  const { id } = req.params;
-  const { nombre, departamento, fecha_ingreso } = req.body;
-  
-  const query = 'UPDATE usuario SET nombre = ?, departamento = ?, fecha_ingreso = ? WHERE id = ?';
-  
-  connection.query(query, [nombre, departamento, fecha_ingreso, id], (err, results) => {
-    if (err) {
-      console.error('Error al actualizar:', err);
-      return res.status(500).json({ error: 'Error al actualizar usuario' });
-    }
-    res.json({ mensaje: 'Usuario actualizado correctamente' });
-  });
-});
 
-// Ruta para eliminar un usuario
-app.delete('/api/usuarios/:id', (req, res) => {
-  const { id } = req.params;
-  
-  const query = 'DELETE FROM usuario WHERE id = ?';
-  
-  connection.query(query, [id], (err, results) => {
-    if (err) {
-      console.error('Error al eliminar:', err);
-      return res.status(500).json({ error: 'Error al eliminar usuario' });
-    }
-    res.json({ mensaje: 'Usuario eliminado correctamente' });
-  });
-});
 
-// Manejo de errores de conexión
-connection.on('error', (err) => {
-  console.error('Error en la conexión MySQL:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.log('La conexión a MySQL se perdió.');
-  }
-  if (err.code === 'ER_CON_COUNT_ERROR') {
-    console.log('MySQL rechazó la conexión (demasiadas conexiones).');
-  }
-  if (err.code === 'ECONNREFUSED') {
-    console.log('MySQL rechazó la conexión.');
-  }
-});
 
-// Puerto del servidor
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
+app.listen(3001, () => {
+  console.log('Servidor corriendo en puerto 3001');
 });
