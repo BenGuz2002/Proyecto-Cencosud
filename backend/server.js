@@ -1,10 +1,8 @@
 const express = require('express');
 const app = express();
-const mysql = require('mysql2/promise');
+const mysql = require('mysql2');
 const cors = require('cors');
 const crypto = require('crypto');
-
-
 
 app.use(cors());
 app.use(express.json());
@@ -19,6 +17,14 @@ const db = mysql.createConnection({
     user: "root",
     password: "5170",
     database: "cencosud"
+});
+
+db.connect((err) => {
+  if (err) {
+    console.error('Error conectando a MySQL:', err);
+  } else {
+    console.log('Conectado a MySQL correctamente');
+  }
 });
 
 
@@ -53,15 +59,24 @@ app.post("/usuario", (req, res) => {
     const fecha_ingreso = req.body.fecha_ingreso;
     const departamento = req.body.departamento;
 
+    // Validar que tenga los datos requeridos
+    if (!nombre || !fecha_ingreso || !departamento) {
+        return res.status(400).json({ error: "Faltan datos requeridos: nombre, fecha_ingreso, departamento" });
+    }
+
     db.query(
         "INSERT INTO usuario (nombre, fecha_ingreso, departamento) VALUES (?,?,?)",
         [nombre, fecha_ingreso, departamento],
     (err, result) => {
         if(err) {
-            console.log(err);
+            console.error('Error en POST /usuario:', err);
+            res.status(500).json({ error: "Error al crear usuario", details: err.message });
         } 
         else {
-            res.send("Usuario registrado");
+            res.status(201).json({ 
+                message: "Usuario registrado correctamente", 
+                id: result.insertId 
+            });
         }
     });
 });
@@ -69,7 +84,8 @@ app.post("/usuario", (req, res) => {
 app.get("/usuario", (req, res) => {
   db.query("SELECT id, nombre, fecha_ingreso, departamento FROM usuario", (err, result) => {
     if (err) {
-      res.status(500).send("Error al obtener usuarios");
+      console.error('Error en query GET /usuario:', err);
+      res.status(500).json({ error: "Error al obtener usuarios", details: err.message });
     } else {
       res.json(result);
     }
@@ -89,9 +105,57 @@ app.get("/usuario/:id", (req, res) => {
   });
 });
 
+// GET - Obtener todas las fechas
+app.get("/fechas", (req, res) => {
+  db.query("SELECT * FROM fechas", (err, result) => {
+    if (err) {
+      console.error('Error en query GET /fechas:', err);
+      res.status(500).json({ error: "Error al obtener fechas", details: err.message });
+    } else {
+      res.json(result);
+    }
+  });
+});
 
+// GET - Obtener fechas por usuario
+app.get("/fechas/:usuario_id", (req, res) => {
+  const usuario_id = req.params.usuario_id;
+  db.query("SELECT * FROM fechas WHERE usuario_id = ?", [usuario_id], (err, result) => {
+    if (err) {
+      res.status(500).json({ error: "Error al obtener fechas", details: err.message });
+    } else {
+      res.json(result);
+    }
+  });
+});
 
+// PUT - Editar usuario
+app.put("/usuario/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+  const { nombre, fecha_ingreso, departamento } = req.body;
 
+  // Validar que tenga los datos requeridos
+  if (!nombre || !fecha_ingreso || !departamento) {
+    return res.status(400).json({ error: "Faltan datos requeridos: nombre, fecha_ingreso, departamento" });
+  }
+
+  console.log(`PUT /usuario/:id - ID: ${id}, nombre: ${nombre}, fecha: ${fecha_ingreso}, depto: ${departamento}`);
+
+  db.query(
+    "UPDATE usuario SET nombre = ?, fecha_ingreso = ?, departamento = ? WHERE id = ?",
+    [nombre, fecha_ingreso, departamento, id],
+    (err, result) => {
+      if (err) {
+        console.error('Error en PUT /usuario/:id:', err);
+        res.status(500).json({ error: "Error al actualizar usuario", details: err.message });
+      } else if (result.affectedRows === 0) {
+        res.status(404).json({ error: `Usuario no encontrado con ID: ${id}` });
+      } else {
+        res.json({ message: "Usuario actualizado correctamente", id: id });
+      }
+    }
+  );
+});
 
 app.listen(3001, () => {
   console.log('Servidor corriendo en puerto 3001');

@@ -23,6 +23,23 @@
   font-weight: bold;
 }
 
+.navbar-logo .logo-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-logo .logo-img {
+  height: 50px;
+  width: auto;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.navbar-logo .logo-img:hover {
+  opacity: 0.8;
+}
+
 .navbar-menu {
   display: flex;
   list-style: none;

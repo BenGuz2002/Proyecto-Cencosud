@@ -1,13 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import './navbar.css';
+import CencoLogo from '../img/Cencosud.png';
 
 function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-logo">
-          <h1>Cencosud</h1>
+          <Link to="/" className="logo-link">
+            <img src={CencoLogo} alt="Cencosud" className="logo-img" />
+          </Link>
         </div>
         <ul className="navbar-menu">
           <li className="navbar-item">
